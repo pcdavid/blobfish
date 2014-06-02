@@ -5,15 +5,22 @@
             [clojure.data.json :as json])
   (:gen-class))
 
-(def default-config {:port 8080})
+(def default-config
+  "The defaults to use if no configuration file is specified."
+  {:port 8080})
 
-(defn load-config [args]
-  (if (= (count args) 1)
-    (let [file (java.io.FileReader. (nth args 0))]
-      (merge default-config (json/read-json file)))
-    default-config))
+(defn load-config
+  "Loads configurations parameters from the file passed as first
+  argument, if any. Returns the effective configuration to use."
+  [args]
+  (merge default-config
+         (when (= (count args) 1)
+           (json/read-json (java.io.FileReader. (args 0))))))
 
-(defn valid-config? [config]
+(defn valid-config?
+  "Check that the specified configuration map contains all mandatory
+  parameters"
+  [config]
   (every? #(contains? config %) #{:port :repo}))
 
 (defn parse-uri [uri]
@@ -23,8 +30,18 @@
       {:branch (.substring path 0 sep)
        :path   (.substring path (inc sep))})))
 
-(defn git [repo cmd & args]
-  (apply sh/proc (apply conj ["git" (str "--git-dir=" repo) cmd] args)))
+;; We will need to invoke various git subcommands; this is a generic
+;; wrapper for doing that. It uses conch to perform the actual
+;; invocation, and return a conch map describing the resulting
+;; process, which can be used to access the process's status, stdout,
+;; stderr etc.
+
+(defn git
+  "Invokes a git command with the specified arguments, in the context
+  of a particular repo. The repo must be the absolute path of a local
+  .git directory."
+  [repo cmd & args]
+  (apply sh/proc (into ["git" (str "--git-dir=" repo) cmd] args)))
 
 (defn git-show [repo branch path]
   (git repo "show" (str branch ":" path)))
