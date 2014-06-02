@@ -43,13 +43,24 @@
   [repo cmd & args]
   (apply sh/proc (into ["git" (str "--git-dir=" repo) cmd] args)))
 
-(defn git-show [repo branch path]
-  (git repo "show" (str branch ":" path)))
+(defn git-show
+  [repo rev path]
+  (git repo "show" (str rev ":" path)))
+
+(defn git-rev-parse
+  [repo rev]
+  (let [p (git repo "rev-parse" rev)]
+    (if (empty? (slurp (:err p)))
+      (let [h (slurp (:out p))]
+        (.substring h 0 (dec (count h)))))))
 
 (defn git-branch-exists? [repo branch]
-  (let [p (git repo "rev-parse" branch)]
-    (and (empty? (slurp (:err p)))
-         (>= (count (slurp (:out p))) 41))))
+  (if-let [rev (git-rev-parse repo branch)]
+    (= (count rev) 40)))
+
+(defn git-tree
+  [repo rev]
+  (git-rev-parse repo (str rev "^{tree}")))
 
 (defn handle-locally [repo branch path]
   (if (git-branch-exists? repo branch)
